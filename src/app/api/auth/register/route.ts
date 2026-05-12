@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
+import { createSupabaseServer } from "@/lib/supabase/server";
+import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { prisma } from "@/lib/db";
-import { createSession } from "@/lib/auth";
 
 export async function POST(req: Request) {
   try {
@@ -10,30 +10,43 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Dados inválidos (senha mín. 6)" }, { status: 400 });
     }
     const normEmail = String(email).toLowerCase();
-    const existing = await prisma.user.findUnique({ where: { email: normEmail } });
-    if (existing) {
-      return NextResponse.json({ error: "Email já cadastrado" }, { status: 409 });
+
+    // Cria via Admin API com email_confirm=true (sem confirmação por email)
+    const admin = createSupabaseAdmin();
+    const { data, error } = await admin.auth.admin.createUser({
+      email: normEmail,
+      password: String(password),
+      email_confirm: true,
+      user_metadata: { name: String(name) },
+    });
+    if (error || !data.user) {
+      const msg = error?.message?.includes("already")
+        ? "Email já cadastrado"
+        : error?.message || "Erro no cadastro";
+      return NextResponse.json({ error: msg }, { status: 400 });
     }
 
+    // Espelha na tabela User do Prisma
     const count = await prisma.user.count();
     const adminEmail = (process.env.ADMIN_EMAIL || "").toLowerCase();
     const isAdmin = count === 0 || (adminEmail !== "" && normEmail === adminEmail);
 
-    const user = await prisma.user.create({
-      data: {
-        email: normEmail,
-        name: String(name),
-        password: await bcrypt.hash(String(password), 10),
-        isAdmin,
-      },
+    await prisma.user.upsert({
+      where: { id: data.user.id },
+      create: { id: data.user.id, email: normEmail, name: String(name), isAdmin },
+      update: { email: normEmail, name: String(name) },
     });
 
-    await createSession({
-      sub: user.id,
-      email: user.email,
-      name: user.name,
-      isAdmin: user.isAdmin,
+    // Faz login imediato
+    const supabase = await createSupabaseServer();
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: normEmail,
+      password: String(password),
     });
+    if (signInError) {
+      return NextResponse.json({ error: "Cadastro ok, mas falhou no login" }, { status: 500 });
+    }
+
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: "Erro no cadastro" }, { status: 500 });

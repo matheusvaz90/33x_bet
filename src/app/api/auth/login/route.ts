@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/db";
-import { createSession } from "@/lib/auth";
+import { createSupabaseServer } from "@/lib/supabase/server";
 
 export async function POST(req: Request) {
   try {
@@ -9,20 +7,14 @@ export async function POST(req: Request) {
     if (!email || !password) {
       return NextResponse.json({ error: "Dados inválidos" }, { status: 400 });
     }
-    const user = await prisma.user.findUnique({ where: { email: String(email).toLowerCase() } });
-    if (!user) {
-      return NextResponse.json({ error: "Credenciais inválidas" }, { status: 401 });
-    }
-    const ok = await bcrypt.compare(String(password), user.password);
-    if (!ok) {
-      return NextResponse.json({ error: "Credenciais inválidas" }, { status: 401 });
-    }
-    await createSession({
-      sub: user.id,
-      email: user.email,
-      name: user.name,
-      isAdmin: user.isAdmin,
+    const supabase = await createSupabaseServer();
+    const { error } = await supabase.auth.signInWithPassword({
+      email: String(email).toLowerCase(),
+      password: String(password),
     });
+    if (error) {
+      return NextResponse.json({ error: "Credenciais inválidas" }, { status: 401 });
+    }
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: "Erro no login" }, { status: 500 });

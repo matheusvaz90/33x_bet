@@ -1,0 +1,13 @@
+-- AlterTable
+ALTER TABLE "Match" ADD COLUMN     "totalFouls" INTEGER;
+
+-- AlterTable
+ALTER TABLE "Palpite" ADD COLUMN     "foulsPoints" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "goalsPoints" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "scorePoints" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "totalFouls" INTEGER,
+ADD COLUMN     "totalGoals" INTEGER,
+ADD COLUMN     "winnerGuess" TEXT,
+ADD COLUMN     "winnerPoints" INTEGER NOT NULL DEFAULT 0,
+ALTER COLUMN "homeScore" DROP NOT NULL,
+ALTER COLUMN "awayScore" DROP NOT NULL;

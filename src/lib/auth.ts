@@ -1,9 +1,6 @@
-import { SignJWT, jwtVerify } from "jose";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-
-const COOKIE_NAME = "bolao_session";
-const COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
+import { createSupabaseServer } from "@/lib/supabase/server";
+import { prisma } from "@/lib/db";
 
 export type SessionPayload = {
   sub: string;
@@ -12,50 +9,40 @@ export type SessionPayload = {
   isAdmin: boolean;
 };
 
-function getSecret() {
-  const secret = process.env.AUTH_SECRET;
-  if (!secret) throw new Error("AUTH_SECRET não configurado");
-  return new TextEncoder().encode(secret);
-}
-
-export async function createSession(payload: SessionPayload) {
-  const token = await new SignJWT({ ...payload })
-    .setProtectedHeader({ alg: "HS256" })
-    .setSubject(payload.sub)
-    .setIssuedAt()
-    .setExpirationTime("30d")
-    .sign(getSecret());
-
-  const store = await cookies();
-  store.set(COOKIE_NAME, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    maxAge: COOKIE_MAX_AGE,
-    path: "/",
-  });
-}
-
-export async function destroySession() {
-  const store = await cookies();
-  store.delete(COOKIE_NAME);
-}
-
 export async function getSession(): Promise<SessionPayload | null> {
-  try {
-    const store = await cookies();
-    const token = store.get(COOKIE_NAME)?.value;
-    if (!token) return null;
-    const { payload } = await jwtVerify(token, getSecret());
-    return {
-      sub: String(payload.sub),
-      email: String(payload.email),
-      name: String(payload.name),
-      isAdmin: Boolean(payload.isAdmin),
-    };
-  } catch {
-    return null;
+  const supabase = await createSupabaseServer();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  // Garante que o espelho na tabela User existe (caso o usuário tenha sido
+  // criado direto no Supabase Auth fora do nosso fluxo de /register).
+  let dbUser = await prisma.user.findUnique({ where: { id: user.id } });
+  if (!dbUser) {
+    const adminEmail = (process.env.ADMIN_EMAIL || "").toLowerCase();
+    const email = (user.email || "").toLowerCase();
+    const count = await prisma.user.count();
+    const isAdmin = count === 0 || (adminEmail !== "" && email === adminEmail);
+    dbUser = await prisma.user.create({
+      data: {
+        id: user.id,
+        email,
+        name:
+          (user.user_metadata?.name as string | undefined) ||
+          email.split("@")[0] ||
+          "Usuário",
+        isAdmin,
+      },
+    });
   }
+
+  return {
+    sub: dbUser.id,
+    email: dbUser.email,
+    name: dbUser.name,
+    isAdmin: dbUser.isAdmin,
+  };
 }
 
 export async function requireSession(): Promise<SessionPayload> {

@@ -3,44 +3,63 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
-  id        String    @id @default(cuid())
+  id        String    @id @db.Uuid
   email     String    @unique
   name      String
-  password  String
   isAdmin   Boolean   @default(false)
   createdAt DateTime  @default(now())
   palpites  Palpite[]
 }
 
 model Match {
-  id        String    @id @default(cuid())
-  stage     String
-  group     String?
-  homeTeam  String
-  awayTeam  String
-  kickoff   DateTime
-  homeScore Int?
-  awayScore Int?
-  finished  Boolean   @default(false)
-  palpites  Palpite[]
+  id         String    @id @default(cuid())
+  stage      String
+  group      String?
+  homeTeam   String
+  awayTeam   String
+  kickoff    DateTime
+  homeScore  Int?
+  awayScore  Int?
+  totalFouls Int?
+  finished   Boolean   @default(false)
+  palpites   Palpite[]
 }
 
 model Palpite {
-  id        String   @id @default(cuid())
-  userId    String
-  matchId   String
-  homeScore Int
-  awayScore Int
-  points    Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  match     Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  id           String   @id @default(cuid())
+  userId       String   @db.Uuid
+  matchId      String
+
+  // Mercado 1: placar exato (opcional)
+  homeScore    Int?
+  awayScore    Int?
+
+  // Mercado 2: vencedor (HOME, DRAW, AWAY) — opcional
+  winnerGuess  String?
+
+  // Mercado 3: total de gols na partida
+  totalGoals   Int?
+
+  // Mercado 4: total de faltas na partida
+  totalFouls   Int?
+
+  // Pontuação por mercado (somadas em `points`)
+  scorePoints  Int      @default(0)
+  winnerPoints Int      @default(0)
+  goalsPoints  Int      @default(0)
+  foulsPoints  Int      @default(0)
+  points       Int      @default(0)
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  match        Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
 
   @@unique([userId, matchId])
 }

@@ -9,6 +9,7 @@
     "lint": "next lint",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
+    "db:sync": "tsx prisma/seedFromApi.ts",
     "db:reset": "prisma migrate reset --force"
   },
   "prisma": {
@@ -16,6 +17,8 @@
   },
   "dependencies": {
     "@prisma/client": "^6.1.0",
+    "@supabase/ssr": "^0.10.3",
+    "@supabase/supabase-js": "^2.105.4",
     "bcryptjs": "^2.4.3",
     "jose": "^5.9.6",
     "next": "15.1.0",

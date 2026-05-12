@@ -1,12 +1,13 @@
 # Bolão Copa do Mundo 2026
 
-Sistema web para um bolão da Copa do Mundo 2026 entre colegas. Next.js 15 (App Router) + TypeScript + Tailwind v4 + Prisma + SQLite, com autenticação própria (bcrypt + JWT em cookie httpOnly).
+Sistema web para um bolão da Copa do Mundo 2026 entre colegas.
+**Stack:** Next.js 15 (App Router) + TypeScript + Tailwind v4 + Prisma + **Supabase (Postgres + Auth)**.
 
 ## Setup
 
 ```bash
 cp .env.example .env
-# edite AUTH_SECRET (string aleatória longa) e ADMIN_EMAIL
+# preencha os valores (veja a seção abaixo)
 
 npm install
 npx prisma migrate dev --name init
@@ -16,20 +17,44 @@ npm run dev
 
 Abra http://localhost:3000.
 
+## Variáveis de ambiente
+
+```env
+# Banco Postgres do Supabase (conexão direta)
+DATABASE_URL="postgresql://postgres:<SENHA>@db.<PROJECT_REF>.supabase.co:5432/postgres?sslmode=require"
+DIRECT_URL="postgresql://postgres:<SENHA>@db.<PROJECT_REF>.supabase.co:5432/postgres?sslmode=require"
+
+# Supabase Auth / API
+NEXT_PUBLIC_SUPABASE_URL="https://<PROJECT_REF>.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="sb_publishable_..."
+SUPABASE_SERVICE_ROLE_KEY="sb_secret_..."   # nunca expor no client
+
+# Admin inicial (criado pelo seed via Admin API)
+ADMIN_EMAIL="admin@bolao.local"
+ADMIN_PASSWORD="admin123"
+```
+
+Onde achar no painel Supabase:
+
+- `DATABASE_URL` / `DIRECT_URL` → **Project Settings → Database → Connection string**
+- `NEXT_PUBLIC_SUPABASE_URL` → **Project Settings → Data API → Project URL**
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` → **Project Settings → API Keys → Publishable key**
+- `SUPABASE_SERVICE_ROLE_KEY` → **Project Settings → API Keys → Secret key**
+
+> **Importante**: desligue a confirmação de email em **Authentication → Providers → Email → "Confirm email"**, pois o app cria usuários com `email_confirm=true` via Admin API e espera login imediato.
+
 ## Acesso inicial
 
-- O seed cria um admin: **`admin@bolao.local`** (ou o valor de `ADMIN_EMAIL`) com senha **`admin123`**.
-- Você também pode acessar `/register` para criar uma conta. O **primeiro usuário cadastrado vira admin automaticamente**; e qualquer cadastro cujo email bata com `ADMIN_EMAIL` também é admin.
+- O seed cria um admin no Supabase Auth: **`admin@bolao.local`** (ou o valor de `ADMIN_EMAIL`) com senha **`admin123`** (ou `ADMIN_PASSWORD`).
+- `/register` cria via **Admin API** (`auth.admin.createUser` com `email_confirm=true`) — sem clicar em link de confirmação.
+- **Quem é admin?** Quem tem email = `ADMIN_EMAIL`, ou é o primeiro usuário cadastrado. A flag `isAdmin` fica na tabela `User` (espelho do `auth.users` pelo UUID).
 
-## Como o admin renomeia os times
+## Arquitetura de auth
 
-O seed cria 72 partidas (12 grupos × 6 jogos) com nomes placeholder (`A1`, `A2`, ..., `L4`). Depois do sorteio da Copa, o admin entra em `/admin` e:
-
-1. Renomeia `homeTeam` e `awayTeam` de cada jogo.
-2. Ajusta o `kickoff` se necessário.
-3. Clica em **Salvar jogo**.
-
-Quando o jogo terminar, o admin coloca o placar final e clica em **Salvar resultado** — todos os palpites daquele jogo são repontuados automaticamente. Há também um botão **Limpar** para reverter o resultado (zera pontos do jogo).
+- Não usamos NextAuth. Usamos `@supabase/ssr` que mantém a sessão em cookies httpOnly.
+- O `src/middleware.ts` faz refresh do token a cada request.
+- `src/lib/auth.ts` expõe `getSession`, `requireSession`, `requireAdmin` — lê `auth.getUser()` do Supabase e cruza com a tabela `User` do Prisma (cria espelho automático na 1ª chamada se não existir).
+- O service_role só é usado server-side: em `/api/auth/register` (criar user com email confirmado) e no seed.
 
 ## Regra de pontuação
 
@@ -51,50 +76,83 @@ Multiplicadores por fase:
 
 Resultado final = `Math.round(base * multiplicador)`.
 
-Desempate no ranking: **pontos → placares exatos (cravadas) → vencedores acertados**.
+Desempate: **pontos → placares exatos (cravadas) → vencedores acertados**.
 
 ## Bloqueio de palpites
 
-Cada palpite só pode ser salvo/editado enquanto `kickoff > agora`. Após o kickoff a interface mostra um cadeado 🔒 e a API bloqueia o `POST /api/palpites`.
+Cada palpite só pode ser salvo/editado enquanto `kickoff > agora`. Após o kickoff a interface mostra 🔒 e a API bloqueia o `POST /api/palpites`.
+
+## Admin
+
+Em `/admin` o admin pode:
+
+1. Renomear `homeTeam` / `awayTeam` e ajustar `kickoff` de cada jogo (o seed coloca placeholders `A1`..`L4`).
+2. Salvar o placar final → repontua todos os palpites daquele jogo automaticamente.
+3. Limpar resultado → zera os pontos.
 
 ## Scripts
 
-- `npm run dev` — Next dev server
+- `npm run dev` — dev server
 - `npm run build` — `prisma generate && prisma migrate deploy && next build`
 - `npm start` — produção
-- `npm run db:push` — `prisma db push`
+- `npm run db:push` — `prisma db push` (sem migration)
 - `npm run db:seed` — roda `prisma/seed.ts`
-- `npm run db:reset` — `prisma migrate reset --force`
+- `npm run db:reset` — `prisma migrate reset --force` (⚠️ apaga dados)
 
-## Mata-mata (TODO)
+## Sincronizar jogos reais (football-data.org)
 
-A seed atualmente cria apenas a fase de grupos. As partidas do mata-mata (oitavas, quartas, semis, disputa de 3º e final) devem ser cadastradas pelo admin depois que os classificados forem definidos. Uma futura iteração pode incluir uma UI dedicada para criar partidas (`stage = R16 | QF | SF | TP | FINAL`) e calcular os confrontos a partir do ranking dos grupos.
+A seed inicial (`npm run db:seed`) cria 72 partidas com nomes placeholder (`A1`..`L4`). Para puxar os jogos reais da Copa do Mundo 2026 (grupos + mata-mata, com times e horários oficiais):
+
+1. Crie conta grátis em https://www.football-data.org/client/register
+2. Copie o **X-Auth-Token** do painel
+3. Adicione no `.env`:
+   ```
+   FOOTBALL_DATA_TOKEN="seu-token-aqui"
+   ```
+4. Rode:
+   ```bash
+   npm run db:sync
+   ```
+
+O script ([prisma/seedFromApi.ts](prisma/seedFromApi.ts)):
+
+- Busca todas as partidas do `competition WC` (FIFA World Cup) na API.
+- Mapeia os stages: `GROUP_STAGE→GROUP`, `LAST_16→R16`, `QUARTER_FINALS→QF`, `SEMI_FINALS→SF`, `THIRD_PLACE→TP`, `FINAL→FINAL`.
+- Substitui os placeholders `A1`/`A2`/... do grupo correto pelos times reais retornados pela API (preserva os IDs dos jogos, então palpites existentes continuam válidos).
+- Cria as 32 partidas do mata-mata.
+- Se uma partida já estiver `FINISHED` na API, importa o placar também (mas não recalcula pontos — use o `/admin` para finalizar e disparar a repontuação).
+- É **idempotente**: pode rodar várias vezes; só atualiza kickoffs/times.
+
+**Limite gratuito:** 10 req/min, 100 req/dia. O sync usa só 1 request.
 
 ## Estrutura
 
 ```
 prisma/
-  schema.prisma
-  seed.ts
+  schema.prisma           # provider postgresql, User.id é UUID (espelho de auth.users)
+  seed.ts                 # cria admin via Admin API + espelha no User + 72 partidas
 src/
+  middleware.ts           # refresh do cookie de sessão Supabase
   lib/
-    db.ts          # singleton PrismaClient
-    auth.ts        # createSession, getSession, requireSession, requireAdmin
-    scoring.ts     # STAGE_MULTIPLIER, STAGE_LABEL, calcPoints
+    db.ts                 # singleton PrismaClient
+    auth.ts               # getSession/requireSession/requireAdmin (lê Supabase + Prisma)
+    scoring.ts            # calcPoints + multiplicadores
+    supabase/
+      server.ts           # createServerClient (App Router)
+      client.ts           # createBrowserClient
+      admin.ts            # service_role (NUNCA importar no client)
   app/
     layout.tsx
     globals.css
     page.tsx
-    login/page.tsx
-    register/page.tsx
+    login/page.tsx        # POST /api/auth/login
+    register/page.tsx     # POST /api/auth/register
     (app)/
-      layout.tsx
+      layout.tsx          # exige sessão; header com nav + logout
       ranking/page.tsx
       jogos/page.tsx
-      palpites/page.tsx
-      palpites/PalpitesForm.tsx
-      admin/page.tsx
-      admin/AdminMatches.tsx
+      palpites/page.tsx + PalpitesForm.tsx
+      admin/page.tsx + AdminMatches.tsx
     api/
       auth/login/route.ts
       auth/register/route.ts
