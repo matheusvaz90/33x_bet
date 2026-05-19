@@ -6,36 +6,35 @@ export const dynamic = "force-dynamic";
 
 export default async function PalpitesPage() {
   const session = await requireSession();
-  const matches = await prisma.match.findMany({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const raw = await prisma.match.findMany({
     orderBy: { kickoff: "asc" },
-    include: {
-      palpites: { where: { userId: session.sub } },
-    },
-  });
+    include: { palpites: { where: { userId: session.sub } } },
+  }) as any[];
 
-  const data = matches.map((m) => ({
-    id: m.id,
-    stage: m.stage,
-    group: m.group,
-    homeTeam: m.homeTeam,
-    awayTeam: m.awayTeam,
-    kickoff: m.kickoff.toISOString(),
-    finished: m.finished,
-    homeScore: m.homeScore,
-    awayScore: m.awayScore,
-    totalFouls: m.totalFouls,
+  const data = raw.map((m) => ({
+    id: m.id as string,
+    stage: m.stage as string,
+    group: m.group as string | null,
+    homeTeam: m.homeTeam as string,
+    awayTeam: m.awayTeam as string,
+    kickoff: (m.kickoff as Date).toISOString(),
+    status: (m.status as string) ?? "SCHEDULED",
+    homeScore: m.homeScore as number | null,
+    awayScore: m.awayScore as number | null,
+    totalFouls: m.totalFouls as number | null,
     palpite: m.palpites[0]
       ? {
-          homeScore: m.palpites[0].homeScore,
-          awayScore: m.palpites[0].awayScore,
-          winnerGuess: m.palpites[0].winnerGuess,
-          totalGoals: m.palpites[0].totalGoals,
-          totalFouls: m.palpites[0].totalFouls,
-          points: m.palpites[0].points,
-          scorePoints: m.palpites[0].scorePoints,
-          winnerPoints: m.palpites[0].winnerPoints,
-          goalsPoints: m.palpites[0].goalsPoints,
-          foulsPoints: m.palpites[0].foulsPoints,
+          homeScore: m.palpites[0].homeScore as number | null,
+          awayScore: m.palpites[0].awayScore as number | null,
+          winnerGuess: m.palpites[0].winnerGuess as string | null,
+          totalGoals: m.palpites[0].totalGoals as number | null,
+          totalFouls: m.palpites[0].totalFouls as number | null,
+          points: m.palpites[0].points as number,
+          scorePoints: m.palpites[0].scorePoints as number,
+          winnerPoints: m.palpites[0].winnerPoints as number,
+          goalsPoints: m.palpites[0].goalsPoints as number,
+          foulsPoints: m.palpites[0].foulsPoints as number,
         }
       : null,
   }));

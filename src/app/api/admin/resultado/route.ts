@@ -14,26 +14,22 @@ export async function POST(req: Request) {
     if (typeof id !== "string") {
       return NextResponse.json({ error: "id obrigatório" }, { status: 400 });
     }
-    const match = await prisma.match.findUnique({ where: { id } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const match = await (prisma.match as any).findUnique({ where: { id } });
     if (!match) {
       return NextResponse.json({ error: "Jogo não encontrado" }, { status: 404 });
     }
 
     if (clear) {
       await prisma.$transaction([
-        prisma.match.update({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (prisma.match as any).update({
           where: { id },
-          data: { homeScore: null, awayScore: null, totalFouls: null, finished: false },
+          data: { homeScore: null, awayScore: null, totalFouls: null, status: "SCHEDULED" },
         }),
         prisma.palpite.updateMany({
           where: { matchId: id },
-          data: {
-            points: 0,
-            scorePoints: 0,
-            winnerPoints: 0,
-            goalsPoints: 0,
-            foulsPoints: 0,
-          },
+          data: { points: 0, scorePoints: 0, winnerPoints: 0, goalsPoints: 0, foulsPoints: 0 },
         }),
       ]);
       return NextResponse.json({ ok: true });
@@ -58,34 +54,23 @@ export async function POST(req: Request) {
 
     const palpites = await prisma.palpite.findMany({ where: { matchId: id } });
 
-    const updates = palpites.map((p) => {
+    const updates = palpites.map((p: typeof palpites[number]) => {
       const b = calcBreakdown(
-        {
-          homeScore: p.homeScore,
-          awayScore: p.awayScore,
-          winnerGuess: p.winnerGuess,
-          totalGoals: p.totalGoals,
-          totalFouls: p.totalFouls,
-        },
+        { homeScore: p.homeScore, awayScore: p.awayScore, winnerGuess: p.winnerGuess, totalGoals: p.totalGoals, totalFouls: p.totalFouls },
         { homeScore, awayScore, totalFouls: realFouls },
         match.stage,
       );
       return prisma.palpite.update({
         where: { id: p.id },
-        data: {
-          scorePoints: b.scorePoints,
-          winnerPoints: b.winnerPoints,
-          goalsPoints: b.goalsPoints,
-          foulsPoints: b.foulsPoints,
-          points: b.points,
-        },
+        data: { scorePoints: b.scorePoints, winnerPoints: b.winnerPoints, goalsPoints: b.goalsPoints, foulsPoints: b.foulsPoints, points: b.points },
       });
     });
 
     await prisma.$transaction([
-      prisma.match.update({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (prisma.match as any).update({
         where: { id },
-        data: { homeScore, awayScore, totalFouls: realFouls, finished: true },
+        data: { homeScore, awayScore, totalFouls: realFouls, status: "FINISHED" },
       }),
       ...updates,
     ]);

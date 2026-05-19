@@ -48,40 +48,110 @@ async function main() {
 
   // 3) Cria partidas da fase de grupos (idempotente)
   const matchCount = await prisma.match.count();
-  if (matchCount > 0) {
+  if (matchCount === 0) {
+    const groups = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"];
+    const order: Array<[number, number]> = [
+      [1, 2],
+      [3, 4],
+      [1, 3],
+      [2, 4],
+      [4, 1],
+      [2, 3],
+    ];
+
+    let kickoff = new Date(Date.UTC(2026, 5, 11, 16, 0, 0));
+
+    for (const g of groups) {
+      for (const [h, a] of order) {
+        await prisma.match.create({
+          data: {
+            stage: "GROUP",
+            group: g,
+            homeTeam: `${g}${h}`,
+            awayTeam: `${g}${a}`,
+            kickoff: new Date(kickoff),
+          },
+        });
+        kickoff = new Date(kickoff.getTime() + 3 * 60 * 60 * 1000);
+      }
+    }
+
+    console.log(`Criadas ${groups.length * order.length} partidas da fase de grupos.`);
+  } else {
     console.log(`Já existem ${matchCount} partidas, pulando seed de jogos.`);
-    return;
   }
 
-  const groups = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"];
-  const order: Array<[number, number]> = [
-    [1, 2],
-    [3, 4],
-    [1, 3],
-    [2, 4],
-    [4, 1],
-    [2, 3],
+  // 4) Seed das seleções para Palpite de Ouro (48 times da Copa 2026)
+  const selecoes = [
+    // Anfitriões
+    { nome: "Estados Unidos", pais: "United States", bandeira: "🇺🇸" },
+    { nome: "Canadá", pais: "Canada", bandeira: "🇨🇦" },
+    { nome: "México", pais: "Mexico", bandeira: "🇲🇽" },
+    // CONMEBOL
+    { nome: "Brasil", pais: "Brazil", bandeira: "🇧🇷" },
+    { nome: "Argentina", pais: "Argentina", bandeira: "🇦🇷" },
+    { nome: "Colômbia", pais: "Colombia", bandeira: "🇨🇴" },
+    { nome: "Uruguai", pais: "Uruguay", bandeira: "🇺🇾" },
+    { nome: "Equador", pais: "Ecuador", bandeira: "🇪🇨" },
+    { nome: "Venezuela", pais: "Venezuela", bandeira: "🇻🇪" },
+    { nome: "Paraguai", pais: "Paraguay", bandeira: "🇵🇾" },
+    { nome: "Chile", pais: "Chile", bandeira: "🇨🇱" },
+    { nome: "Bolívia", pais: "Bolivia", bandeira: "🇧🇴" },
+    { nome: "Peru", pais: "Peru", bandeira: "🇵🇪" },
+    // UEFA
+    { nome: "Espanha", pais: "Spain", bandeira: "🇪🇸" },
+    { nome: "França", pais: "France", bandeira: "🇫🇷" },
+    { nome: "Inglaterra", pais: "England", bandeira: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" },
+    { nome: "Alemanha", pais: "Germany", bandeira: "🇩🇪" },
+    { nome: "Portugal", pais: "Portugal", bandeira: "🇵🇹" },
+    { nome: "Holanda", pais: "Netherlands", bandeira: "🇳🇱" },
+    { nome: "Bélgica", pais: "Belgium", bandeira: "🇧🇪" },
+    { nome: "Croácia", pais: "Croatia", bandeira: "🇭🇷" },
+    { nome: "Áustria", pais: "Austria", bandeira: "🇦🇹" },
+    { nome: "Escócia", pais: "Scotland", bandeira: "🏴󠁧󠁢󠁳󠁣󠁴󠁿" },
+    { nome: "Hungria", pais: "Hungary", bandeira: "🇭🇺" },
+    { nome: "Romênia", pais: "Romania", bandeira: "🇷🇴" },
+    { nome: "Dinamarca", pais: "Denmark", bandeira: "🇩🇰" },
+    { nome: "Eslováquia", pais: "Slovakia", bandeira: "🇸🇰" },
+    { nome: "Suíça", pais: "Switzerland", bandeira: "🇨🇭" },
+    { nome: "Albânia", pais: "Albania", bandeira: "🇦🇱" },
+    { nome: "Turquia", pais: "Turkey", bandeira: "🇹🇷" },
+    { nome: "Sérvia", pais: "Serbia", bandeira: "🇷🇸" },
+    { nome: "Ucrânia", pais: "Ukraine", bandeira: "🇺🇦" },
+    // CONCACAF
+    { nome: "Panamá", pais: "Panama", bandeira: "🇵🇦" },
+    { nome: "Costa Rica", pais: "Costa Rica", bandeira: "🇨🇷" },
+    { nome: "Honduras", pais: "Honduras", bandeira: "🇭🇳" },
+    { nome: "Jamaica", pais: "Jamaica", bandeira: "🇯🇲" },
+    // CAF
+    { nome: "Marrocos", pais: "Morocco", bandeira: "🇲🇦" },
+    { nome: "Senegal", pais: "Senegal", bandeira: "🇸🇳" },
+    { nome: "Egito", pais: "Egypt", bandeira: "🇪🇬" },
+    { nome: "Nigéria", pais: "Nigeria", bandeira: "🇳🇬" },
+    { nome: "Camarões", pais: "Cameroon", bandeira: "🇨🇲" },
+    { nome: "Costa do Marfim", pais: "Ivory Coast", bandeira: "🇨🇮" },
+    { nome: "África do Sul", pais: "South Africa", bandeira: "🇿🇦" },
+    { nome: "Mali", pais: "Mali", bandeira: "🇲🇱" },
+    { nome: "RD Congo", pais: "DR Congo", bandeira: "🇨🇩" },
+    // AFC
+    { nome: "Japão", pais: "Japan", bandeira: "🇯🇵" },
+    { nome: "Coreia do Sul", pais: "South Korea", bandeira: "🇰🇷" },
+    { nome: "Arábia Saudita", pais: "Saudi Arabia", bandeira: "🇸🇦" },
+    { nome: "Austrália", pais: "Australia", bandeira: "🇦🇺" },
+    { nome: "Irã", pais: "Iran", bandeira: "🇮🇷" },
+    { nome: "Uzbequistão", pais: "Uzbekistan", bandeira: "🇺🇿" },
   ];
 
-  // 2026-06-11 13:00 -03:00 = 2026-06-11 16:00 UTC
-  let kickoff = new Date(Date.UTC(2026, 5, 11, 16, 0, 0));
-
-  for (const g of groups) {
-    for (const [h, a] of order) {
-      await prisma.match.create({
-        data: {
-          stage: "GROUP",
-          group: g,
-          homeTeam: `${g}${h}`,
-          awayTeam: `${g}${a}`,
-          kickoff: new Date(kickoff),
-        },
-      });
-      kickoff = new Date(kickoff.getTime() + 3 * 60 * 60 * 1000);
-    }
+  let selecoesCriadas = 0;
+  for (const s of selecoes) {
+    await prisma.selecao.upsert({
+      where: { nome: s.nome },
+      update: {},
+      create: { nome: s.nome, pais: s.pais, bandeira: s.bandeira, pesoPalpiteOuro: 50 },
+    });
+    selecoesCriadas++;
   }
-
-  console.log(`Criadas ${groups.length * order.length} partidas da fase de grupos.`);
+  console.log(`${selecoesCriadas} seleções garantidas no banco.`);
 }
 
 main()

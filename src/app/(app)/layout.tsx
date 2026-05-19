@@ -12,36 +12,29 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <span className="text-2xl">🏆</span>
             <div className="flex flex-col leading-none">
               <span className="font-display text-2xl tracking-wider">BOLÃO</span>
-              <span className="font-display text-[0.65rem] tracking-[0.3em] wc-gradient-text">
-                COPA 2026
-              </span>
+              <span className="font-display text-[0.65rem] tracking-[0.3em] wc-gradient-text">COPA 2026</span>
             </div>
           </Link>
 
-          <nav className="flex items-center gap-1 text-sm font-semibold uppercase tracking-wider">
+          <nav className="flex items-center gap-1 text-sm font-semibold uppercase tracking-wider flex-wrap">
             <NavLink href="/ranking">Ranking</NavLink>
             <NavLink href="/jogos">Jogos</NavLink>
             <NavLink href="/times">Seleções</NavLink>
             <NavLink href="/palpites">Palpites</NavLink>
+            <NavLink href="/palpite-ouro">Ouro</NavLink>
+            <NavLink href="/perfil">Perfil</NavLink>
             {session.isAdmin && (
-              <NavLink href="/admin" highlight>
-                Admin
-              </NavLink>
+              <NavLink href="/admin" highlight>Admin</NavLink>
             )}
           </nav>
 
           <div className="ml-auto flex items-center gap-3 text-sm">
             <div className="hidden sm:flex flex-col items-end leading-tight">
-              <span className="text-zinc-400 text-[0.7rem] uppercase tracking-widest">
-                Logado
-              </span>
+              <span className="text-zinc-400 text-[0.7rem] uppercase tracking-widest">Logado</span>
               <span className="font-semibold">{session.name}</span>
             </div>
             <form action="/api/auth/logout" method="post">
-              <button
-                type="submit"
-                className="bg-zinc-900 hover:bg-zinc-800 border border-[color:var(--c-border)] rounded-lg px-3 py-1.5 text-xs uppercase tracking-wider font-semibold"
-              >
+              <button type="submit" className="bg-zinc-900 hover:bg-zinc-800 border border-[color:var(--c-border)] rounded-lg px-3 py-1.5 text-xs uppercase tracking-wider font-semibold">
                 Sair
               </button>
             </form>
@@ -60,15 +53,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   );
 }
 
-function NavLink({
-  href,
-  children,
-  highlight,
-}: {
-  href: string;
-  children: React.ReactNode;
-  highlight?: boolean;
-}) {
+function NavLink({ href, children, highlight }: { href: string; children: React.ReactNode; highlight?: boolean }) {
   return (
     <Link
       href={href}

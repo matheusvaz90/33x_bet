@@ -29,10 +29,10 @@ export function formatKickoff(d: Date) {
   }).format(d);
 }
 
-export function isLive(kickoff: Date, finished: boolean) {
-  if (finished) return false;
+export function isLive(kickoff: Date, status: string) {
+  if (status === "IN_PROGRESS") return true;
+  if (status === "FINISHED") return false;
   const now = Date.now();
   const start = kickoff.getTime();
-  // janela "ao vivo": entre kickoff e kickoff + 2h30
   return now >= start && now <= start + 2.5 * 60 * 60 * 1000;
 }

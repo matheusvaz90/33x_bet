@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 
+const LOCK_MINUTES = 30;
+
 function intOrNull(v: unknown): number | null {
   if (v === null || v === undefined || v === "") return null;
   const n = Number(v);
@@ -31,45 +33,33 @@ export async function POST(req: Request) {
     const totalGoals = intOrNull(body.totalGoals);
     const totalFouls = intOrNull(body.totalFouls);
 
-    // pelo menos um mercado preenchido
     const hasAny =
       (homeScore !== null && awayScore !== null) ||
       winnerGuess !== null ||
       totalGoals !== null ||
       totalFouls !== null;
     if (!hasAny) {
-      return NextResponse.json(
-        { error: "Preencha ao menos um palpite" },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: "Preencha ao menos um palpite" }, { status: 400 });
     }
 
-    const match = await prisma.match.findUnique({ where: { id: body.matchId } });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const match = await (prisma.match as any).findUnique({ where: { id: body.matchId } });
     if (!match) {
       return NextResponse.json({ error: "Jogo não encontrado" }, { status: 404 });
     }
-    if (match.kickoff.getTime() <= Date.now()) {
-      return NextResponse.json({ error: "Palpites encerrados para este jogo" }, { status: 403 });
+
+    const lockTime = new Date((match.kickoff as Date).getTime() - LOCK_MINUTES * 60 * 1000);
+    if (new Date() >= lockTime) {
+      return NextResponse.json(
+        { error: `Palpites encerrados. Bloqueio ${LOCK_MINUTES} min antes do kickoff.` },
+        { status: 403 },
+      );
     }
 
     await prisma.palpite.upsert({
       where: { userId_matchId: { userId: session.sub, matchId: body.matchId } },
-      create: {
-        userId: session.sub,
-        matchId: body.matchId,
-        homeScore,
-        awayScore,
-        winnerGuess,
-        totalGoals,
-        totalFouls,
-      },
-      update: {
-        homeScore,
-        awayScore,
-        winnerGuess,
-        totalGoals,
-        totalFouls,
-      },
+      create: { userId: session.sub, matchId: body.matchId, homeScore, awayScore, winnerGuess, totalGoals, totalFouls },
+      update: { homeScore, awayScore, winnerGuess, totalGoals, totalFouls },
     });
 
     return NextResponse.json({ ok: true });
