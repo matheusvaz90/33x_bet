@@ -27,12 +27,12 @@ export default async function PerfilPage() {
       where: { id: session.sub },
       select: { id: true, name: true, email: true, statusInscricao: true, valorInscricao: true, createdAt: true },
     }),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     prisma.palpite.findMany({
       where: { userId: session.sub },
       include: { match: true },
       orderBy: { match: { kickoff: "desc" } },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    }) as any[],
+    }) as unknown as Promise<any[]>,
     db.palpiteOuro.findUnique({
       where: { userId: session.sub },
       include: { selecao: true },
@@ -71,11 +71,12 @@ export default async function PerfilPage() {
     const m = p.match as Record<string, unknown>;
     if (m.status !== "FINISHED" || m.homeScore === null || m.awayScore === null) return false;
     const realVencedor = Math.sign((m.homeScore as number) - (m.awayScore as number));
-    if (p.homeScore !== null && p.awayScore !== null) {
-      return Math.sign(p.homeScore - p.awayScore) === realVencedor;
+    if (p.homeScore != null && p.awayScore != null) {
+      return Math.sign((p.homeScore as number) - (p.awayScore as number)) === realVencedor;
     }
     if (p.winnerGuess) {
-      const guess = p.winnerGuess === "HOME" ? 1 : p.winnerGuess === "AWAY" ? -1 : 0;
+      const w = String(p.winnerGuess);
+      const guess = w === "HOME" ? 1 : w === "AWAY" ? -1 : 0;
       return guess === realVencedor;
     }
     return false;

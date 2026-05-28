@@ -46,7 +46,7 @@ export default async function TimesPage() {
     if (m.homeTeam === "A definir" || m.awayTeam === "A definir") continue;
     ensure(m.homeTeam, m.group);
     ensure(m.awayTeam, m.group);
-    if (m.finished && m.homeScore !== null && m.awayScore !== null) {
+    if (m.status === "FINISHED" && m.homeScore !== null && m.awayScore !== null) {
       const h = ensure(m.homeTeam, m.group);
       const a = ensure(m.awayTeam, m.group);
       h.played++;
